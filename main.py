@@ -1,43 +1,79 @@
 import streamlit as st
 from openai import OpenAI
 import os
+import PyPDF2
 
-st.title("memoriq.ai - Dein AI Wissensassistent")
-
-# OpenAI API Key aus den Replit Secrets lesen
+# === SETUP ===
+st.set_page_config(page_title="memoriq.ai", layout="wide")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-uploaded_file = st.file_uploader("Lade eine Datei hoch (PDF, Text, Bild)", type=["pdf", "txt", "png", "jpg", "jpeg"])
-file_content = None
+# === SESSION-STATE für Dateien ===
+if "files" not in st.session_state:
+    st.session_state["files"] = {}
 
-if uploaded_file is not None:
-    # Dateiinhalt lesen (als Text für PDF/Text, als Bytes für Bilder)
-    if uploaded_file.type == "application/pdf":
-        import PyPDF2
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
-        file_content = ""
-        for page in pdf_reader.pages:
-            file_content += page.extract_text() + "\n"
-    elif uploaded_file.type.startswith("text/"):
-        file_content = uploaded_file.getvalue().decode("utf-8")
+# === NAVIGATION ===
+page = st.sidebar.radio("📚 Navigation", ["📥 Upload", "📂 Meine Dateien", "💬 Fragen"])
+
+# === SEITE 1: UPLOAD ===
+if page == "📥 Upload":
+    st.title("📥 Datei hochladen")
+    uploaded_file = st.file_uploader("Lade eine Datei hoch", type=["pdf", "txt", "jpg", "png"])
+
+    if uploaded_file is not None:
+        file_name = uploaded_file.name
+
+        # PDF oder Text-Datei auslesen
+        if uploaded_file.type == "application/pdf":
+            pdf_reader = PyPDF2.PdfReader(uploaded_file)
+            content = "\n".join([page.extract_text() for page in pdf_reader.pages])
+        elif uploaded_file.type.startswith("text/"):
+            content = uploaded_file.getvalue().decode("utf-8")
+        else:
+            content = f"[{file_name}] (Dateityp {uploaded_file.type}) – noch nicht unterstützt"
+
+        # Datei speichern im Session-State
+        st.session_state["files"][file_name] = content
+        st.success(f"✅ Datei '{file_name}' erfolgreich hochgeladen.")
+
+        st.subheader("Inhalt (Auszug):")
+        st.write(content[:500])
+
+# === SEITE 2: MEINE DATEIEN ===
+elif page == "📂 Meine Dateien":
+    st.title("📂 Meine Dateien")
+
+    if not st.session_state["files"]:
+        st.info("Du hast noch keine Dateien hochgeladen.")
     else:
-        file_content = f"Dateityp {uploaded_file.type} wird aktuell nicht unterstützt."
+        for name, content in st.session_state["files"].items():
+            with st.expander(f"📄 {name}"):
+                st.write(content[:500])
+                if st.button(f"🗑 Löschen: {name}", key=f"delete_{name}"):
+                    del st.session_state["files"][name]
+                    st.experimental_rerun()
 
-    st.write("Inhalt der Datei (Auszug):")
-    st.write(file_content[:500])  # Zeige die ersten 500 Zeichen
+# === SEITE 3: CHAT ===
+elif page == "💬 Fragen":
+    st.title("💬 Frag deine Dateien")
 
+    if not st.session_state["files"]:
+        st.info("Bitte lade zuerst eine Datei hoch.")
+    else:
+        file_choice = st.selectbox("Wähle eine Datei", list(st.session_state["files"].keys()))
+        query = st.text_input("Deine Frage")
 
-query = st.text_input("Stelle eine Frage an Deinen Assistenten")
-
-if query:
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": (file_content or "") + "\n" + query}],
-
-            max_tokens=150
-        )
-        answer = response.choices[0].message.content
-        st.write(answer)
-    except Exception as e:
-        st.error(f"Fehler bei der AI-Anfrage: {e}")
+        if query:
+            context = st.session_state["files"][file_choice]
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": "Du bist ein persönlicher Wissensassistent."},
+                        {"role": "user", "content": f"{context}\n\nFrage: {query}"}
+                    ],
+                    max_tokens=300
+                )
+                st.markdown("**Antwort:**")
+                st.write(response.choices[0].message.content)
+            except Exception as e:
+                st.error(f"Fehler bei der AI-Anfrage: {e}")
