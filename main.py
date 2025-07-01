@@ -13,25 +13,20 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 if "files" not in st.session_state:
     st.session_state["files"] = {}
 
-# Navigation mit fettem aktiven Element via Buttons
+# Navigation als Radio-Buttons ohne Emojis
 pages = ["Upload", "Meine Dateien", "Fragen"]
 
-def nav_button(page_name):
-    if st.session_state.current_page == page_name:
-        st.markdown(f"<span style='font-weight:bold; font-size:18px; margin-right:20px;'>{page_name}</span>", unsafe_allow_html=True)
+def format_option(label, selected):
+    if selected:
+        return f"**{label}**"
     else:
-        if st.button(page_name):
-            st.session_state.current_page = page_name
+        return label
 
-if "current_page" not in st.session_state:
-    st.session_state.current_page = "Upload"
-
-cols = st.columns(len(pages))
-for i, p in enumerate(pages):
-    with cols[i]:
-        nav_button(p)
-
-page = st.session_state.current_page
+page = st.sidebar.radio(
+    "Navigation",
+    options=pages,
+    format_func=lambda x: x,  # Labels unverändert (ohne Emojis)
+)
 
 # === SEITE 1: UPLOAD ===
 if page == "Upload":
