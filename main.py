@@ -5,24 +5,42 @@ import PyPDF2
 
 # === SETUP ===
 st.set_page_config(page_title="memoriq.ai", layout="wide")
+
+st.markdown("<h1 style='text-align:center;'>Memoriq</h1>", unsafe_allow_html=True)
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# === SESSION-STATE für Dateien ===
 if "files" not in st.session_state:
     st.session_state["files"] = {}
 
-# === NAVIGATION ===
-page = st.sidebar.radio("📚 Navigation", ["📥 Upload", "📂 Meine Dateien", "💬 Fragen"])
+# Navigation mit fettem aktiven Element via Buttons
+pages = ["Upload", "Meine Dateien", "Fragen"]
+
+def nav_button(page_name):
+    if st.session_state.current_page == page_name:
+        st.markdown(f"<span style='font-weight:bold; font-size:18px; margin-right:20px;'>{page_name}</span>", unsafe_allow_html=True)
+    else:
+        if st.button(page_name):
+            st.session_state.current_page = page_name
+
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "Upload"
+
+cols = st.columns(len(pages))
+for i, p in enumerate(pages):
+    with cols[i]:
+        nav_button(p)
+
+page = st.session_state.current_page
 
 # === SEITE 1: UPLOAD ===
-if page == "📥 Upload":
-    st.title("📥 Datei hochladen")
+if page == "Upload":
+    st.title("Datei hochladen")
     uploaded_file = st.file_uploader("Lade eine Datei hoch", type=["pdf", "txt", "jpg", "png"])
 
     if uploaded_file is not None:
         file_name = uploaded_file.name
 
-        # PDF oder Text-Datei auslesen
         if uploaded_file.type == "application/pdf":
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
             content = "\n".join([page.extract_text() for page in pdf_reader.pages])
@@ -31,37 +49,32 @@ if page == "📥 Upload":
         else:
             content = f"[{file_name}] (Dateityp {uploaded_file.type}) – noch nicht unterstützt"
 
-        # Datei speichern im Session-State
         st.session_state["files"][file_name] = content
         st.success(f"✅ Datei '{file_name}' erfolgreich hochgeladen.")
-
         st.subheader("Inhalt (Auszug):")
         st.write(content[:500])
 
 # === SEITE 2: MEINE DATEIEN ===
-elif page == "📂 Meine Dateien":
-    st.title("📂 Meine Dateien")
-
+elif page == "Meine Dateien":
+    st.title("Meine Dateien")
     if not st.session_state["files"]:
         st.info("Du hast noch keine Dateien hochgeladen.")
     else:
         for name, content in st.session_state["files"].items():
-            with st.expander(f"📄 {name}"):
+            with st.expander(f"{name}"):
                 st.write(content[:500])
                 if st.button(f"🗑 Löschen: {name}", key=f"delete_{name}"):
                     del st.session_state["files"][name]
                     st.experimental_rerun()
 
-# === SEITE 3: CHAT ===
-elif page == "💬 Fragen":
-    st.title("💬 Frag deine Dateien")
-
+# === SEITE 3: FRAGEN ===
+elif page == "Fragen":
+    st.title("Frag deine Dateien")
     if not st.session_state["files"]:
         st.info("Bitte lade zuerst eine Datei hoch.")
     else:
         file_choice = st.selectbox("Wähle eine Datei", list(st.session_state["files"].keys()))
         query = st.text_input("Deine Frage")
-
         if query:
             context = st.session_state["files"][file_choice]
             try:
