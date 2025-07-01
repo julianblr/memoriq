@@ -6,26 +6,20 @@ import PyPDF2
 # === SETUP ===
 st.set_page_config(page_title="memoriq.ai", layout="wide")
 
-st.markdown("<h1 style='text-align:center;'>Memoriq</h1>", unsafe_allow_html=True)
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 if "files" not in st.session_state:
     st.session_state["files"] = {}
 
-# Navigation als Radio-Buttons ohne Emojis
+# Memoriq-Header in der Sidebar
+st.sidebar.markdown("<h1 style='text-align:center;'>Memoriq</h1>", unsafe_allow_html=True)
+
+# Navigation als Radio-Buttons ohne Label (label hidden)
 pages = ["Upload", "Meine Dateien", "Fragen"]
-
-def format_option(label, selected):
-    if selected:
-        return f"**{label}**"
-    else:
-        return label
-
 page = st.sidebar.radio(
-    "Navigation",
+    label="Navigation",
     options=pages,
-    format_func=lambda x: x,  # Labels unverändert (ohne Emojis)
+    label_visibility="collapsed",  # Label ausblenden
 )
 
 # === SEITE 1: UPLOAD ===
